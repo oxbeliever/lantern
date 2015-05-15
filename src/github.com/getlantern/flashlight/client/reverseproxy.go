@@ -1,6 +1,7 @@
 package client
 
 import (
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -44,7 +45,13 @@ func (client *Client) initReverseProxy(bal *balancer.Balancer, dumpHeaders bool)
 				// challenge is that ReverseProxy reuses connections for
 				// different requests, so we might have to configure different
 				// ReverseProxies for different QOS's or something like that.
-				Dial: detour.Dialer(bal.Dial),
+				Dial: func() func(network, addr string) (net.Conn, error) {
+					if client.ProxyAll {
+						return bal.Dial
+					} else {
+						return detour.Dialer(bal.Dial)
+					}
+				}(),
 			}),
 		// Set a FlushInterval to prevent overly aggressive buffering of
 		// responses, which helps keep memory usage down
